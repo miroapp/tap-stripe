@@ -61,12 +61,14 @@ def sync(config, state, catalog):
             singer.write_schema(stream_id,
                                 stream_schema,
                                 stream_key_properties)
-            # TODO We are not bookmarking yet
             for obj in STREAM_SDK_OBJECTS[stream_id].list(
                     # If we want to increase the page size we can do
                     # `limit=N` as a second parameter here.
-                    stripe_account=config.get(
-                        'account_id')).auto_paging_iter():
+                    stripe_account=config.get('account_id'),
+                    # None passed to starting_after appears to retrieve
+                    # all of them so this should always be safe.
+                    starting_after=singer.get_bookmark(state, stream_id, 'id')
+            ).auto_paging_iter():
                 singer.write_record(stream_id,
                                     transformer.transform(
                                         obj,
@@ -103,8 +105,6 @@ def main():
     msg = "Successfully connected to Stripe Account with display name" \
         + " `%s`"
     LOGGER.info(msg, account.display_name)
-
-    # TODO need to exit early for a connection check
 
     catalog = discover()
 
