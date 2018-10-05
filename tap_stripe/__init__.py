@@ -42,7 +42,8 @@ def discover():
             'tap_stream_id': schema_name,
             'schema': schema,
             'metadata': [],
-            # TODO This might need to change for Events because their key property may not be 
+            # Events may have a different key property than this. Change
+            # if it's appropriate.
             'key_properties': ['id']
         }
         streams.append(catalog_entry)
@@ -62,6 +63,8 @@ def sync(config, state, catalog):
                                 stream_key_properties)
             # TODO We are not bookmarking yet
             for obj in STREAM_SDK_OBJECTS[stream_id].list(
+                    # If we want to increase the page size we can do
+                    # `limit=N` as a second parameter here.
                     stripe_account=config.get(
                         'account_id')).auto_paging_iter():
                 singer.write_record(stream_id,
