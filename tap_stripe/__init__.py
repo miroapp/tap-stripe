@@ -49,7 +49,7 @@ def discover():
 
     return {'streams': streams}
 
-def sync(config, catalog):
+def sync(config, state, catalog):
     # Loop over streams in catalog
     for stream in catalog['streams']:
         stream_id = stream['tap_stream_id']
@@ -69,6 +69,11 @@ def sync(config, catalog):
                                         obj,
                                         stream_schema,
                                         {}))
+                singer.write_bookmark(state,
+                                      stream_id,
+                                      'id',
+                                      obj.id)
+                singer.write_state(state)
 
 @utils.handle_top_exception(LOGGER)
 def main():
@@ -100,7 +105,7 @@ def main():
 
     catalog = discover()
 
-    sync(args.config, catalog)
+    sync(args.config, args.state, catalog)
 
 if __name__ == "__main__":
     main()
