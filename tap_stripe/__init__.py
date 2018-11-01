@@ -265,7 +265,11 @@ def sync_sub_stream(sub_stream_name, parent, save_bookmarks=True):
 
     elif sub_stream_name == 'upcoming_invoices':
         # get upcoming invoices
-        object_list = [stripe.Invoice.upcoming(customer=parent.customer)]
+        object_list = []
+        try:
+            object_list = [stripe.Invoice.upcoming(customer=parent.customer)]
+        except stripe.error.InvalidRequestError as e:
+            LOGGER.error("Failed to load upcoming invoice: %s", e)
 
     else:  # SubscriptionItem
         # If we want to increase the page size we can do
