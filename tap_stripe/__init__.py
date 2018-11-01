@@ -75,7 +75,7 @@ class Context():
     @classmethod
     def is_selected(cls, stream_name):
         stream = cls.get_catalog_entry(stream_name)
-        if stream:
+        if stream is not None:
             stream_metadata = metadata.to_map(stream['metadata'])
             return metadata.get(stream_metadata, (), 'selected')
         return False
