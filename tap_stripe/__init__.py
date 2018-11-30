@@ -44,7 +44,7 @@ EVENT_RESOURCE_TO_STREAM = {
 }
 
 SUB_STREAMS = {
-    'subscriptions': ['subscription_items', 'upcoming_invoices'],
+    'subscriptions': ['subscription_items', 'upcoming_invoices'], # TODO why subscriptions not customer
     'invoices': ['invoice_line_items'],
     'upcoming_invoices': ['upcoming_invoice_line_items']
 }
@@ -326,58 +326,67 @@ def sync_event_updates():
             # starting_after=singer.get_bookmark(Context.state, 'events', 'updates_id'),
             created={"gte": created_bookmark}
     ).auto_paging_iter():
-        event_resource_obj = events_obj.data.object
-        stream_name = EVENT_RESOURCE_TO_STREAM.get(event_resource_obj.object)
-        event_resource_stream = Context.get_catalog_entry(stream_name)
+        event_updated_object = events_obj.data.object
 
-        sub_stream_ids = get_sub_streams(stream_name)
-        should_sync_stream = event_resource_stream and Context.is_selected(stream_name)
+        event_type = events_obj.type
+        # TODO rewrite this selection
+        if event_type == 'invoice.upcoming':
+            stream_name = 'upcoming_invoices'
+        else:
+            stream_name = EVENT_RESOURCE_TO_STREAM.get(event_updated_object.object)
+
+        stream_for_event = Context.get_catalog_entry(stream_name)
+        should_sync_stream = stream_for_event and Context.is_selected(stream_name)
 
         # if we got an event for a selected stream, sync the updates for that stream
         if should_sync_stream:
             with Transformer(singer.UNIX_SECONDS_INTEGER_DATETIME_PARSING) as transformer:
-                event_resource_metadata = metadata.to_map(event_resource_stream['metadata'])
-                rec = transformer.transform(event_resource_obj.to_dict_recursive(),
-                                            event_resource_stream['schema'],
+                event_resource_metadata = metadata.to_map(stream_for_event['metadata'])
+                rec = transformer.transform(event_updated_object.to_dict_recursive(),
+                                            stream_for_event['schema'],
                                             event_resource_metadata)
-                # we've observed event_resources without ids (e.g. invoice.upcoming events)
-                parent_id = rec.get('id')
-                if parent_id:
+
+                object_id = rec.get('id')
+                if stream_name == 'upcoming_invoices':
                     singer.write_record(stream_name,
                                         rec,
                                         time_extracted=extraction_time)
 
                     Context.updated_counts[stream_name] += 1
 
-                    # TODO add subscription items support
-                    for sub_stream_id in sub_stream_ids:
-                        if Context.is_selected(sub_stream_id):
-                            # TODO avoid invoice loading
-                            if sub_stream_id == "invoice_line_items":
-                                # retrieve parent object and query children
+                else:
+                    if object_id:
+                        singer.write_record(stream_name,
+                                            rec,
+                                            time_extracted=extraction_time)
+
+                        Context.updated_counts[stream_name] += 1
+
+                # TODO add subscription items support
+                sub_stream_names = get_sub_streams(stream_name)
+                # TODO make special cases configurable
+                if event_type == 'invoice.created':
+                    sub_stream_names.append('upcoming_invoices')
+
+                for sub_stream_id in sub_stream_names:
+                    if Context.is_selected(sub_stream_id):
+                        if sub_stream_id == "invoice_line_items":
+                            # retrieve parent object and query children
+                            parent_object = None
+                            if object_id:
                                 try:
                                     # sometimes the invoice that presented in the event cannot be loaded, weird
-                                    parent_object = STREAM_SDK_OBJECTS[stream_name].retrieve(parent_id)
+                                    # parent_object = STREAM_SDK_OBJECTS[stream_name].retrieve(object_id)
+                                    parent_object = event_updated_object
                                 except stripe.error.InvalidRequestError as e:
                                     LOGGER.error("Failed to load invoice: %s", e)
-                                    parent_object = None
 
-                                if parent_object:
-                                    sync_sub_stream(sub_stream_id, parent_object, False)
+                            if parent_object:
+                                sync_sub_stream(sub_stream_id, parent_object, False)
 
-                            if sub_stream_id == "upcoming_invoices":
-                                # TODO
-                                pass
-
-                            if sub_stream_id == "upcoming_invoice_line_items":
-                                # TODO
-                                pass
-                else:
-                    # TODO implement upcoming
-                    LOGGER.warning('Caught %s event for %s without an id (event id %s)!',
-                                   events_obj.type,
-                                   stream_name,
-                                   events_obj.id)
+                        if sub_stream_id == "upcoming_invoices" or sub_stream_id == "upcoming_invoice_line_items":
+                            # TODO
+                            sync_sub_stream(sub_stream_id, event_updated_object)
 
         if max_created_value < events_obj.created:
             max_created_value = events_obj.created
@@ -391,6 +400,7 @@ def sync_event_updates():
 
 def any_streams_selected():
     return any(s for s in STREAM_SDK_OBJECTS.keys() if Context.is_selected(s))
+
 
 def sync():
     # Write all schemas and init count to 0
