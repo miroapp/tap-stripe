@@ -44,7 +44,7 @@ EVENT_RESOURCE_TO_STREAM = {
 }
 
 SUB_STREAMS = {
-    'subscriptions': ['subscription_items', 'upcoming_invoices'], # TODO why subscriptions not customer
+    'subscriptions': ['subscription_items', 'upcoming_invoices'],  # TODO why subscriptions not customer
     'invoices': ['invoice_line_items'],
     'upcoming_invoices': ['upcoming_invoice_line_items']
 }
@@ -363,10 +363,12 @@ def sync_event_updates():
                         Context.updated_counts[stream_name] += 1
 
                 # TODO add subscription items support
-                sub_stream_names = get_sub_streams(stream_name)
                 # TODO make special cases configurable
                 if event_type == 'invoice.created':
+                    sub_stream_names = list(get_sub_streams(stream_name))  # mutability!
                     sub_stream_names.append('upcoming_invoices')
+                else:
+                    sub_stream_names = get_sub_streams(stream_name)
 
                 for sub_stream_id in sub_stream_names:
                     if Context.is_selected(sub_stream_id):
@@ -418,11 +420,11 @@ def sync():
             Context.updated_counts[stream_name] = 0
 
     # Loop over streams in catalog
-    for catalog_entry in Context.catalog['streams']:
-        stream_name = catalog_entry['tap_stream_id']
-        # Sync records for stream
-        if Context.is_selected(stream_name) and not Context.is_sub_stream(stream_name):
-            sync_stream(stream_name)
+    #for catalog_entry in Context.catalog['streams']:
+    #    stream_name = catalog_entry['tap_stream_id']
+    #    # Sync records for stream
+    #    if Context.is_selected(stream_name) and not Context.is_sub_stream(stream_name):
+    #        sync_stream(stream_name)
 
     # Get event updates
     if any_streams_selected():
