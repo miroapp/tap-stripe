@@ -371,7 +371,7 @@ def sync_event_updates():
 
                 # TODO add subscription items support
                 # TODO make special cases configurable
-                if event_type == 'invoice.created':
+                if event_type == 'invoice.created' or event_type == 'invoice.finalized':
                     sub_stream_names = list(get_sub_streams(stream_name))  # mutability!
                     sub_stream_names.append('upcoming_invoices')
                 else:
@@ -394,7 +394,6 @@ def sync_event_updates():
                                 sync_sub_stream(sub_stream_id, parent_object, False)
 
                         if sub_stream_id == "upcoming_invoices" or sub_stream_id == "upcoming_invoice_line_items":
-                            # TODO
                             sync_sub_stream(sub_stream_id, event_updated_object)
 
         if max_created_value < events_obj.created:
