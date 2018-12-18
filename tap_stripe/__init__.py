@@ -426,11 +426,11 @@ def sync():
             Context.updated_counts[stream_name] = 0
 
     # Loop over streams in catalog
-    #for catalog_entry in Context.catalog['streams']:
-    #    stream_name = catalog_entry['tap_stream_id']
-    #    # Sync records for stream
-    #    if Context.is_selected(stream_name) and not Context.is_sub_stream(stream_name):
-    #        sync_stream(stream_name)
+    for catalog_entry in Context.catalog['streams']:
+        stream_name = catalog_entry['tap_stream_id']
+        # Sync records for stream
+        if Context.is_selected(stream_name) and not Context.is_sub_stream(stream_name):
+            sync_stream(stream_name)
 
     # Get event updates
     if any_streams_selected():
