@@ -261,7 +261,11 @@ def sync_sub_stream(sub_stream_name, parent, save_bookmarks=True):
 
     # TODO make configurable
     if sub_stream_name == 'invoice_line_items':
-        object_list = parent.lines.list().auto_paging_iter()
+        object_list = []
+        try:
+            object_list = parent.lines.list().auto_paging_iter()
+        except stripe.error.InvalidRequestError as e:
+            LOGGER.error("Failed to load invoice: %s", e)
 
     elif sub_stream_name == 'upcoming_invoice_line_items':
         object_list = []
